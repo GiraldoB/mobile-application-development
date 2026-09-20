@@ -42,6 +42,19 @@ import androidx.compose.runtime.setValue
 import co.edu.unal.tictactoe.R
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.ExperimentalMaterial3Api
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+
+
+
 class MainActivity : ComponentActivity() {
 
     private lateinit var mGame: TicTacToeGame
@@ -62,17 +75,28 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                    containerColor = MaterialTheme.colorScheme.surface,
                     topBar = {
-                        TopAppBar(
-                            title = { Text(stringResource(R.string.app_name)) },
+                        CenterAlignedTopAppBar(
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.app_name),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            },
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = Color.Transparent
+                            ),
                             actions = {
                                 Box {
-                                    TextButton(onClick = { showMenu = true }) {
-                                        Text("Menú")
+                                    IconButton(onClick = { showMenu = true }) {
+                                        Text("⋮", fontSize = 20.sp)
                                     }
                                     DropdownMenu(
                                         expanded = showMenu,
-                                        onDismissRequest = { showMenu = false }
+                                        onDismissRequest = { showMenu = false },
+                                        shape = RoundedCornerShape(16.dp)
                                     ) {
                                         DropdownMenuItem(
                                             text = { Text(stringResource(R.string.new_game)) },
@@ -106,10 +130,15 @@ fun TicTacToeBoard(
     resetKey: Int,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    val turnHuman = stringResource(R.string.turn_human)
+    val turnComputer = stringResource(R.string.turn_computer)
+    val resultTie = stringResource(R.string.result_tie)
+    val resultHumanWins = stringResource(R.string.result_human_wins)
+    val resultComputerWins = stringResource(R.string.result_computer_wins)
+
+    var gameStatus by remember { mutableStateOf(turnHuman) }
 
     var board by remember { mutableStateOf(List(9) { ' ' }) }
-    var gameStatus by remember { mutableStateOf(context.getString(R.string.turn_human)) }
     var gameOver by remember { mutableStateOf(false) }
 
     // Quién le toca empezar la próxima partida
@@ -142,14 +171,13 @@ fun TicTacToeBoard(
         gameOver = false
 
         if (humanFirst) {
-            gameStatus = context.getString(R.string.turn_human)
+            gameStatus = turnHuman
         } else {
-            // Le toca a Android primero
-            gameStatus = context.getString(R.string.turn_computer)
+            gameStatus = turnComputer
             val move = game.getComputerMove()
             game.setMove(TicTacToeGame.COMPUTER_PLAYER, move)
             board = board.toMutableList().also { it[move] = TicTacToeGame.COMPUTER_PLAYER }
-            gameStatus = context.getString(R.string.turn_human)
+            gameStatus = turnHuman
         }
 
         // La próxima vez le toca al otro
@@ -187,10 +215,10 @@ fun TicTacToeBoard(
         }
 
         gameStatus = when (winner) {
-            0 -> context.getString(R.string.turn_human)
-            1 -> context.getString(R.string.result_tie)
-            2 -> context.getString(R.string.result_human_wins)
-            3 -> context.getString(R.string.result_computer_wins)
+            0 -> turnHuman
+            1 -> resultTie
+            2 -> resultHumanWins
+            3 -> resultComputerWins
             else -> gameStatus
         }
 
@@ -201,48 +229,64 @@ fun TicTacToeBoard(
     }
 
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
 
-        Row {
-            GameButton(value = board[0], onClick = { onCellClick(0) })
-            GameButton(value = board[1], onClick = { onCellClick(1) })
-            GameButton(value = board[2], onClick = { onCellClick(2) })
+        ScoreBoard(
+            humanWins = humanWins,
+            ties = ties,
+            computerWins = computerWins
+        )
+
+        Spacer(Modifier.height(32.dp))
+
+        // --- Tablero 3x3 responsivo ---
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            repeat(3) { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    repeat(3) { col ->
+                        val index = row * 3 + col
+                        GameCell(
+                            value = board[index],
+                            onClick = { onCellClick(index) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                    }
+                }
+            }
         }
 
-        Row {
-            GameButton(value = board[3], onClick = { onCellClick(3) })
-            GameButton(value = board[4], onClick = { onCellClick(4) })
-            GameButton(value = board[5], onClick = { onCellClick(5) })
-        }
-
-        Row {
-            GameButton(value = board[6], onClick = { onCellClick(6) })
-            GameButton(value = board[7], onClick = { onCellClick(7) })
-            GameButton(value = board[8], onClick = { onCellClick(8) })
-        }
+        Spacer(Modifier.height(28.dp))
 
         Text(
             text = gameStatus,
-            fontSize = 20.sp,
-            modifier = Modifier.padding(top = 20.dp)
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
 
-        // --- Marcador: equivalente moderno al RelativeLayout de la guía ---
-        Row(
-            modifier = Modifier.padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            Text("Humano: $humanWins")
-            Text("Empates: $ties")
-            Text("Android: $computerWins")
-        }
+        Spacer(Modifier.height(20.dp))
 
-        Button(
+        TextButton(
             onClick = { startNewGame() },
-            modifier = Modifier.padding(top = 20.dp)
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.primary
+            )
         ) {
             Text("Nuevo juego")
         }
@@ -251,19 +295,77 @@ fun TicTacToeBoard(
 
 
 @Composable
-fun GameButton(
-    value: Char,
-    onClick: () -> Unit
+private fun ScoreBoard(
+    humanWins: Int,
+    ties: Int,
+    computerWins: Int
 ) {
-
-    Button(
-        onClick = onClick,
-        modifier = Modifier.size(100.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
     ) {
+        ScoreItem("Humano", humanWins, MaterialTheme.colorScheme.primary)
+        ScoreItem("Empates", ties, MaterialTheme.colorScheme.onSurfaceVariant)
+        ScoreItem("Android", computerWins, MaterialTheme.colorScheme.tertiary)
+    }
+}
 
+
+@Composable
+private fun ScoreItem(label: String, value: Int, accent: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value.toString(),
-            fontSize = 40.sp
+            fontSize = 28.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = accent
         )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+
+@Composable
+fun GameCell(
+    value: Char,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isEmpty = value == ' '
+
+    val markColor = when (value) {
+        TicTacToeGame.HUMAN_PLAYER -> MaterialTheme.colorScheme.primary
+        TicTacToeGame.COMPUTER_PLAYER -> MaterialTheme.colorScheme.tertiary
+        else -> Color.Transparent
+    }
+
+    // Pequeño rebote al colocar la ficha: responde a la acción, no decora
+    val scale by animateFloatAsState(
+        targetValue = if (isEmpty) 0.6f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "markScale"
+    )
+
+    Surface(
+        onClick = onClick,
+        enabled = isEmpty,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        tonalElevation = 0.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = value.toString(),
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Light,
+                color = markColor,
+                modifier = Modifier.scale(scale)
+            )
+        }
     }
 }

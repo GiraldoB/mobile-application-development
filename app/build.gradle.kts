@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+
 android {
     namespace = "co.edu.unal.tictactoe"
     compileSdk {
