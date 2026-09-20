@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,22 +22,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 
-
-
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.res.stringResource
-import androidx.compose.runtime.mutableStateOf
+
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import co.edu.unal.tictactoe.R
+
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.ExperimentalMaterial3Api
 
@@ -47,11 +38,19 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.text.font.FontWeight
+
+import androidx.compose.foundation.clickable
+
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import androidx.compose.ui.draw.clip
+
+
 
 
 
@@ -70,8 +69,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             AndroidTicTacToeTutorial2Theme {
 
-                var showMenu by remember { mutableStateOf(false) }
                 var resetKey by remember { mutableIntStateOf(0) }
+                var selectedDifficulty by remember {
+                    mutableStateOf(TicTacToeGame.DifficultyLevel.Harder)
+                }
+
+                // Sincroniza la dificultad inicial de la UI con la lógica del juego
+                LaunchedEffect(Unit) {
+                    mGame.setDifficultyLevel(selectedDifficulty)
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -87,27 +93,18 @@ class MainActivity : ComponentActivity() {
                             },
                             colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                                 containerColor = Color.Transparent
-                            ),
-                            actions = {
-                                Box {
-                                    IconButton(onClick = { showMenu = true }) {
-                                        Text("⋮", fontSize = 20.sp)
-                                    }
-                                    DropdownMenu(
-                                        expanded = showMenu,
-                                        onDismissRequest = { showMenu = false },
-                                        shape = RoundedCornerShape(16.dp)
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.new_game)) },
-                                            onClick = {
-                                                showMenu = false
-                                                resetKey++
-                                            }
-                                        )
-                                    }
-                                }
-                            }
+                            )
+                        )
+                    },
+                    bottomBar = {
+                        BottomActionsBar(
+                            onNewGame = { resetKey++ },
+                            selectedDifficulty = selectedDifficulty,
+                            onSelectDifficulty = { level ->
+                                selectedDifficulty = level
+                                mGame.setDifficultyLevel(level)
+                            },
+                            onExit = { finish() }
                         )
                     }
                 ) { innerPadding ->
@@ -123,6 +120,130 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun BottomActionsBar(
+    onNewGame: () -> Unit,
+    selectedDifficulty: TicTacToeGame.DifficultyLevel,
+    onSelectDifficulty: (TicTacToeGame.DifficultyLevel) -> Unit,
+    onExit: () -> Unit
+) {
+    var showDifficultyMenu by remember { mutableStateOf(false) }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            BottomAction(
+                symbol = "↻",
+                label = "Nuevo juego",
+                onClick = onNewGame
+            )
+
+            Box {
+                BottomAction(
+                    symbol = "⚙",
+                    label = "Dificultad",
+                    onClick = { showDifficultyMenu = true }
+                )
+                DropdownMenu(
+                    expanded = showDifficultyMenu,
+                    onDismissRequest = { showDifficultyMenu = false },
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    DifficultyOption(
+                        label = "Fácil",
+                        level = TicTacToeGame.DifficultyLevel.Easy,
+                        selected = selectedDifficulty,
+                        onSelect = {
+                            onSelectDifficulty(it)
+                            showDifficultyMenu = false
+                        }
+                    )
+                    DifficultyOption(
+                        label = "Difícil",
+                        level = TicTacToeGame.DifficultyLevel.Harder,
+                        selected = selectedDifficulty,
+                        onSelect = {
+                            onSelectDifficulty(it)
+                            showDifficultyMenu = false
+                        }
+                    )
+                    DifficultyOption(
+                        label = "Experto",
+                        level = TicTacToeGame.DifficultyLevel.Expert,
+                        selected = selectedDifficulty,
+                        onSelect = {
+                            onSelectDifficulty(it)
+                            showDifficultyMenu = false
+                        }
+                    )
+                }
+            }
+
+            BottomAction(
+                symbol = "✕",
+                label = "Salir",
+                onClick = onExit
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun BottomAction(
+    symbol: String,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = symbol,
+            fontSize = 20.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+
+@Composable
+private fun DifficultyOption(
+    label: String,
+    level: TicTacToeGame.DifficultyLevel,
+    selected: TicTacToeGame.DifficultyLevel,
+    onSelect: (TicTacToeGame.DifficultyLevel) -> Unit
+) {
+    DropdownMenuItem(
+        text = { Text(label) },
+        leadingIcon = {
+            if (level == selected) {
+                Text(
+                    text = "✓",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        onClick = { onSelect(level) }
+    )
+}
 
 @Composable
 fun TicTacToeBoard(
@@ -282,14 +403,6 @@ fun TicTacToeBoard(
 
         Spacer(Modifier.height(20.dp))
 
-        TextButton(
-            onClick = { startNewGame() },
-            colors = ButtonDefaults.textButtonColors(
-                contentColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Text("Nuevo juego")
-        }
     }
 }
 
