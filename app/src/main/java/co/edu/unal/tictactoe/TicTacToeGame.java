@@ -12,6 +12,17 @@ import java.util.Random;
 import java.util.Scanner;
 
 public class TicTacToeGame {
+
+    // The computer's difficulty levels
+    public enum DifficultyLevel {
+        Easy,
+        Harder,
+        Expert
+    }
+
+    // Current difficulty level
+    private DifficultyLevel mDifficultyLevel = DifficultyLevel.Expert;
+
     public static final char HUMAN_PLAYER = 'X';
     public static final char COMPUTER_PLAYER = 'O';
     public static final char OPEN_SPOT = ' ';
@@ -31,6 +42,17 @@ public class TicTacToeGame {
         mRand = new Random();
 
     }
+
+    public DifficultyLevel getDifficultyLevel() {
+        return mDifficultyLevel;
+    }
+
+    public void setDifficultyLevel(DifficultyLevel difficultyLevel) {
+        mDifficultyLevel = difficultyLevel;
+    }
+
+    //para usarlo en el activity seria
+    //mGame.setDifficultyLevel(TicTacToeGame.DifficultyLevel.Easy);
 
 
     // Check for a winner.  Return
@@ -102,42 +124,90 @@ public class TicTacToeGame {
     }
 
     public int getComputerMove() {
+        int move = -1;
+
+        if (mDifficultyLevel == DifficultyLevel.Easy) {
+            move = getRandomMove();
+        }
+        else if (mDifficultyLevel == DifficultyLevel.Harder) {
+            move = getWinningMove();
+
+            if (move == -1)
+                move = getRandomMove();
+        }
+        else if (mDifficultyLevel == DifficultyLevel.Expert) {
+            // Try to win, but if that's not possible, block.
+            // If that's not possible, move anywhere.
+            move = getWinningMove();
+
+            if (move == -1)
+                move = getBlockingMove();
+
+            if (move == -1)
+                move = getRandomMove();
+        }
+
+        return move;
+    }
+
+    private int getRandomMove() {
         int move;
 
-        // First see if there's a move O can make to win
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            if (mBoard[i] == OPEN_SPOT) {
-                char curr = mBoard[i];
-                mBoard[i] = COMPUTER_PLAYER;
-                if (checkForWinner() == 3) {
-                    mBoard[i] = curr;
-                    return i;
-                }
-                else
-                    mBoard[i] = curr;
-            }
-        }
-
-        // See if there's a move O can make to block X from winning
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            if (mBoard[i] == OPEN_SPOT) {
-                char curr = mBoard[i];
-                mBoard[i] = HUMAN_PLAYER;
-                if (checkForWinner() == 2) {
-                    mBoard[i] = curr;
-                    return i;
-                }
-                else
-                    mBoard[i] = curr;
-            }
-        }
-
-        // Generate random move
         do {
             move = mRand.nextInt(BOARD_SIZE);
         } while (mBoard[move] != OPEN_SPOT);
 
         return move;
+    }
+
+    private int getWinningMove() {
+
+        for (int i = 0; i < BOARD_SIZE; i++) {
+
+            if (mBoard[i] == OPEN_SPOT) {
+
+                char curr = mBoard[i];
+
+                // Temporarily place O
+                mBoard[i] = COMPUTER_PLAYER;
+
+                if (checkForWinner() == 3) {
+                    // Restore the board before returning
+                    mBoard[i] = curr;
+                    return i;
+                }
+
+                // Restore the board
+                mBoard[i] = curr;
+            }
+        }
+
+        return -1;
+    }
+
+    private int getBlockingMove() {
+
+        for (int i = 0; i < BOARD_SIZE; i++) {
+
+            if (mBoard[i] == OPEN_SPOT) {
+
+                char curr = mBoard[i];
+
+                // Temporarily place X
+                mBoard[i] = HUMAN_PLAYER;
+
+                if (checkForWinner() == 2) {
+                    // Restore the board before returning
+                    mBoard[i] = curr;
+                    return i;
+                }
+
+                // Restore the board
+                mBoard[i] = curr;
+            }
+        }
+
+        return -1;
     }
 
 }
