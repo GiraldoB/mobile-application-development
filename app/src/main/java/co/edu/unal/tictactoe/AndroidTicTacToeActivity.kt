@@ -23,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.layout.Box
@@ -34,12 +33,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.ExperimentalMaterial3Api
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +45,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.ui.draw.clip
 
+import android.media.AudioAttributes
+import android.media.SoundPool
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 
 
 
@@ -128,6 +136,7 @@ private fun BottomActionsBar(
     onExit: () -> Unit
 ) {
     var showDifficultyMenu by remember { mutableStateOf(false) }
+    var showExitDialog by remember { mutableStateOf(false) }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer
@@ -188,7 +197,36 @@ private fun BottomActionsBar(
             BottomAction(
                 symbol = "✕",
                 label = "Salir",
-                onClick = onExit
+                onClick = { showExitDialog = true }
+            )
+        }
+        if (showExitDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showExitDialog = false
+                },
+                title = {
+                    Text("¿Salir del juego?")
+                },
+                text = {
+                    Text("¿Estás seguro de que quieres salir?")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = onExit
+                    ) {
+                        Text("Salir")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showExitDialog = false
+                        }
+                    ) {
+                        Text("Cancelar")
+                    }
+                }
             )
         }
     }
@@ -256,27 +294,134 @@ fun TicTacToeBoard(
     val resultTie = stringResource(R.string.result_tie)
     val resultHumanWins = stringResource(R.string.result_human_wins)
     val resultComputerWins = stringResource(R.string.result_computer_wins)
+    var computerTurn by remember { mutableStateOf(false) }
 
-    var gameStatus by remember { mutableStateOf(turnHuman) }
+    val context = LocalContext.current
 
-    var board by remember { mutableStateOf(List(9) { ' ' }) }
-    var gameOver by remember { mutableStateOf(false) }
+    // Imágenes de X y O
+    val humanBitmap = ImageBitmap.imageResource(
+        id = R.drawable.x_img
+    )
 
-    // Quién le toca empezar la próxima partida
-    var humanFirst by remember { mutableStateOf(true) }
+    val computerBitmap = ImageBitmap.imageResource(
+        id = R.drawable.o_img
+    )
+
+    // ---------------------------------------------------------
+    // SoundPool para efectos de sonido
+    // ---------------------------------------------------------
+
+    val soundPool = remember(context) {
+        SoundPool.Builder()
+            .setMaxStreams(2)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .build()
+    }
+
+    var humanSoundId by remember {
+        mutableIntStateOf(0)
+    }
+
+    var computerSoundId by remember {
+        mutableIntStateOf(0)
+    }
+
+    DisposableEffect(soundPool) {
+
+        humanSoundId = soundPool.load(
+            context,
+            R.raw.human_move,
+            1
+        )
+
+        computerSoundId = soundPool.load(
+            context,
+            R.raw.computer_move,
+            1
+        )
+
+        onDispose {
+            soundPool.release()
+        }
+    }
+
+    fun playHumanSound() {
+        if (humanSoundId != 0) {
+            soundPool.play(
+                humanSoundId,
+                1f,
+                1f,
+                1,
+                0,
+                1f
+            )
+        }
+    }
+
+    fun playComputerSound() {
+        if (computerSoundId != 0) {
+            soundPool.play(
+                computerSoundId,
+                1f,
+                1f,
+                1,
+                0,
+                1f
+            )
+        }
+    }
+
+    // ---------------------------------------------------------
+    // Estado del juego
+    // ---------------------------------------------------------
+
+    var gameStatus by remember {
+        mutableStateOf(turnHuman)
+    }
+
+    var board by remember {
+        mutableStateOf(List(9) { ' ' })
+    }
+
+    var gameOver by remember {
+        mutableStateOf(false)
+    }
+
+    // Quién empieza la próxima partida
+    var humanFirst by remember {
+        mutableStateOf(true)
+    }
 
     // Marcador
-    var humanWins by remember { mutableIntStateOf(0) }
-    var computerWins by remember { mutableIntStateOf(0) }
-    var ties by remember { mutableIntStateOf(0) }
+    var humanWins by remember {
+        mutableIntStateOf(0)
+    }
 
-    // Corrige el desfase inicial: la partida 1 ya usó el turno del humano,
-    // así que preparamos que la partida 2 sea de Android.
+    var computerWins by remember {
+        mutableIntStateOf(0)
+    }
+
+    var ties by remember {
+        mutableIntStateOf(0)
+    }
+
+    // La primera partida ya comienza con el humano.
+    // La segunda comenzará con Android.
     LaunchedEffect(Unit) {
         humanFirst = false
     }
 
-    // Registra el resultado en el marcador según lo que devuelva checkForWinner()
+
+
+    // ---------------------------------------------------------
+    // Registrar resultado
+    // ---------------------------------------------------------
+
     fun recordResult(winner: Int) {
         when (winner) {
             1 -> ties++
@@ -285,68 +430,155 @@ fun TicTacToeBoard(
         }
     }
 
-    // Inicia una partida nueva, alternando quién empieza
+    // ---------------------------------------------------------
+    // Iniciar nueva partida
+    // ---------------------------------------------------------
+
     fun startNewGame() {
+
+        computerTurn = false
+
         game.clearBoard()
+
         board = List(9) { ' ' }
+
         gameOver = false
 
         if (humanFirst) {
+
             gameStatus = turnHuman
+
         } else {
+
             gameStatus = turnComputer
+
             val move = game.getComputerMove()
-            game.setMove(TicTacToeGame.COMPUTER_PLAYER, move)
-            board = board.toMutableList().also { it[move] = TicTacToeGame.COMPUTER_PLAYER }
+
+            game.setMove(
+                TicTacToeGame.COMPUTER_PLAYER,
+                move
+            )
+
+            board = board.toMutableList().also {
+                it[move] = TicTacToeGame.COMPUTER_PLAYER
+            }
+
+            playComputerSound()
+
             gameStatus = turnHuman
         }
 
-        // La próxima vez le toca al otro
+        // Alternar quién empieza la siguiente partida
         humanFirst = !humanFirst
     }
 
+    // ---------------------------------------------------------
+    // Detectar el botón "Nuevo juego"
+    // ---------------------------------------------------------
+
     LaunchedEffect(resetKey) {
+
         if (resetKey > 0) {
             startNewGame()
         }
     }
 
+    // ---------------------------------------------------------
+    // Movimiento del jugador
+    // ---------------------------------------------------------
+
     fun onCellClick(location: Int) {
 
-        if (board[location] != ' ' || gameOver) {
+        if (board[location] != ' ' || gameOver || computerTurn) {
             return
         }
 
-        // --- Turno del humano ---
-        game.setMove(TicTacToeGame.HUMAN_PLAYER, location)
+        // -----------------------------------------------------
+        // Turno del humano
+        // -----------------------------------------------------
+
+        game.setMove(
+            TicTacToeGame.HUMAN_PLAYER,
+            location
+        )
+
         board = board.toMutableList().also {
             it[location] = TicTacToeGame.HUMAN_PLAYER
         }
 
-        var winner = game.checkForWinner()
+        playHumanSound()
 
-        // --- Turno de Android, solo si el humano no acabó el juego ---
-        if (winner == 0) {
-            val move = game.getComputerMove()
-            game.setMove(TicTacToeGame.COMPUTER_PLAYER, move)
-            board = board.toMutableList().also {
-                it[move] = TicTacToeGame.COMPUTER_PLAYER
-            }
-            winner = game.checkForWinner()
-        }
+        val winner = game.checkForWinner()
 
-        gameStatus = when (winner) {
-            0 -> turnHuman
-            1 -> resultTie
-            2 -> resultHumanWins
-            3 -> resultComputerWins
-            else -> gameStatus
-        }
-
+        // Si el humano ganó o hubo empate, terminar
         if (winner != 0) {
+
+            gameStatus = when (winner) {
+                1 -> resultTie
+                2 -> resultHumanWins
+                3 -> resultComputerWins
+                else -> gameStatus
+            }
+
             gameOver = true
             recordResult(winner)
+
+        } else {
+
+            // Ahora le toca a Android
+            computerTurn = true
         }
+    }
+
+    LaunchedEffect(computerTurn) {
+
+        if (computerTurn && !gameOver) {
+
+            // Pequeña pausa para que se vea primero el movimiento humano
+            kotlinx.coroutines.delay(900)
+
+            val move = game.getComputerMove()
+
+            if (move != -1 && !gameOver) {
+
+                game.setMove(
+                    TicTacToeGame.COMPUTER_PLAYER,
+                    move
+                )
+
+                board = board.toMutableList().also {
+                    it[move] = TicTacToeGame.COMPUTER_PLAYER
+                }
+
+                playComputerSound()
+
+                val winner = game.checkForWinner()
+
+                gameStatus = when (winner) {
+                    0 -> turnHuman
+                    1 -> resultTie
+                    2 -> resultHumanWins
+                    3 -> resultComputerWins
+                    else -> gameStatus
+                }
+
+                if (winner != 0) {
+
+                    gameOver = true
+                    recordResult(winner)
+                }
+            }
+
+            computerTurn = false
+        }
+    }
+
+    // ---------------------------------------------------------
+    // Tablero
+    // ---------------------------------------------------------
+
+    var boardSize by remember {
+        mutableStateOf(IntSize.Zero)
     }
 
     Column(
@@ -363,37 +595,214 @@ fun TicTacToeBoard(
             computerWins = computerWins
         )
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(
+            Modifier.height(32.dp)
+        )
 
-        // --- Tablero 3x3 responsivo ---
-        Column(
+        // ---------------------------------------------------------
+        // TABLERO PERSONALIZADO
+        // ---------------------------------------------------------
+
+        val gridColor = MaterialTheme.colorScheme.outlineVariant
+        val gridWidth = 6.dp
+
+        Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            repeat(3) { row ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .aspectRatio(1f)
+                .clip(
+                    RoundedCornerShape(18.dp)
+                )
+                .onSizeChanged {
+                    boardSize = it
+                }
+                .pointerInput(
+                    gameOver,
+                    board,
+                    boardSize
                 ) {
-                    repeat(3) { col ->
-                        val index = row * 3 + col
-                        GameCell(
-                            value = board[index],
-                            onClick = { onCellClick(index) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                        )
+
+                    detectTapGestures { offset ->
+
+                        if (
+                            boardSize.width == 0 ||
+                            boardSize.height == 0
+                        ) {
+                            return@detectTapGestures
+                        }
+
+                        // Tamaño de cada celda
+                        val cellWidth =
+                            boardSize.width / 3f
+
+                        val cellHeight =
+                            boardSize.height / 3f
+
+                        // Columna tocada
+                        val col =
+                            (offset.x / cellWidth)
+                                .toInt()
+                                .coerceIn(0, 2)
+
+                        // Fila tocada
+                        val row =
+                            (offset.y / cellHeight)
+                                .toInt()
+                                .coerceIn(0, 2)
+
+                        // Convertir fila/columna
+                        // a posición 0..8
+                        val position =
+                            row * 3 + col
+
+                        onCellClick(position)
                     }
+                }
+        ) {
+
+            // -------------------------------------------------
+            // Dimensiones del tablero
+            // -------------------------------------------------
+
+            val cellWidth =
+                size.width / 3f
+
+            val cellHeight =
+                size.height / 3f
+
+            // -------------------------------------------------
+            // Grosor de las líneas
+            // -------------------------------------------------
+
+            val gridStrokeWidth =
+                gridWidth.toPx()
+
+            // -------------------------------------------------
+            // Dibujar líneas verticales
+            // -------------------------------------------------
+
+            drawLine(
+                color = gridColor,
+                start = Offset(
+                    cellWidth,
+                    0f
+                ),
+                end = Offset(
+                    cellWidth,
+                    size.height
+                ),
+                strokeWidth = gridStrokeWidth
+            )
+
+            drawLine(
+                color = gridColor,
+                start = Offset(
+                    cellWidth * 2,
+                    0f
+                ),
+                end = Offset(
+                    cellWidth * 2,
+                    size.height
+                ),
+                strokeWidth = gridStrokeWidth
+            )
+
+            // -------------------------------------------------
+            // Dibujar líneas horizontales
+            // -------------------------------------------------
+
+            drawLine(
+                color = gridColor,
+                start = Offset(
+                    0f,
+                    cellHeight
+                ),
+                end = Offset(
+                    size.width,
+                    cellHeight
+                ),
+                strokeWidth = gridStrokeWidth
+            )
+
+            drawLine(
+                color = gridColor,
+                start = Offset(
+                    0f,
+                    cellHeight * 2
+                ),
+                end = Offset(
+                    size.width,
+                    cellHeight * 2
+                ),
+                strokeWidth = gridStrokeWidth
+            )
+
+            // -------------------------------------------------
+            // Dibujar X y O
+            // -------------------------------------------------
+
+            for (i in 0 until 9) {
+
+                val row = i / 3
+                val col = i % 3
+
+                val occupant = board[i]
+
+                val bitmap = when (occupant) {
+
+                    TicTacToeGame.HUMAN_PLAYER ->
+                        humanBitmap
+
+                    TicTacToeGame.COMPUTER_PLAYER ->
+                        computerBitmap
+
+                    else ->
+                        null
+                }
+
+                if (bitmap != null) {
+
+                    // Margen para que X/O no toque
+                    // las líneas del tablero
+                    val margin =
+                        cellWidth * 0.12f
+
+                    val left =
+                        col * cellWidth + margin
+
+                    val top =
+                        row * cellHeight + margin
+
+                    val right =
+                        (col + 1) * cellWidth - margin
+
+                    val bottom =
+                        (row + 1) * cellHeight - margin
+
+                    val imageWidth =
+                        (right - left).toInt()
+
+                    val imageHeight =
+                        (bottom - top).toInt()
+
+                    drawImage(
+                        image = bitmap,
+                        dstOffset = IntOffset(
+                            left.toInt(),
+                            top.toInt()
+                        ),
+                        dstSize = IntSize(
+                            imageWidth,
+                            imageHeight
+                        )
+                    )
                 }
             }
         }
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(
+            Modifier.height(28.dp)
+        )
 
         Text(
             text = gameStatus,
@@ -401,8 +810,9 @@ fun TicTacToeBoard(
             color = MaterialTheme.colorScheme.onSurface
         )
 
-        Spacer(Modifier.height(20.dp))
-
+        Spacer(
+            Modifier.height(20.dp)
+        )
     }
 }
 
@@ -438,47 +848,5 @@ private fun ScoreItem(label: String, value: Int, accent: Color) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-
-@Composable
-fun GameCell(
-    value: Char,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isEmpty = value == ' '
-
-    val markColor = when (value) {
-        TicTacToeGame.HUMAN_PLAYER -> MaterialTheme.colorScheme.primary
-        TicTacToeGame.COMPUTER_PLAYER -> MaterialTheme.colorScheme.tertiary
-        else -> Color.Transparent
-    }
-
-    // Pequeño rebote al colocar la ficha: responde a la acción, no decora
-    val scale by animateFloatAsState(
-        targetValue = if (isEmpty) 0.6f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "markScale"
-    )
-
-    Surface(
-        onClick = onClick,
-        enabled = isEmpty,
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        tonalElevation = 0.dp
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = value.toString(),
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Light,
-                color = markColor,
-                modifier = Modifier.scale(scale)
-            )
-        }
     }
 }
