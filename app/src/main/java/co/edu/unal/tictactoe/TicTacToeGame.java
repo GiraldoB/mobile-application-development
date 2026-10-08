@@ -55,6 +55,16 @@ public class TicTacToeGame {
     //mGame.setDifficultyLevel(TicTacToeGame.DifficultyLevel.Easy);
 
 
+    /**
+     * Restablece el tablero interno a partir de un arreglo guardado.
+     * Se usa para sincronizar la lógica del juego después de que Android
+     * recrea la Activity (por ejemplo al rotar la pantalla), ya que en ese
+     * caso se crea una instancia nueva de TicTacToeGame.
+     */
+    public void setBoardState(char[] board) {
+        mBoard = board.clone();
+    }
+
     // Check for a winner.  Return
     //  0 if no winner or tie yet
     //  1 if it's a tie
