@@ -72,6 +72,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
 
 class MainActivity : ComponentActivity() {
 
@@ -85,58 +87,101 @@ class MainActivity : ComponentActivity() {
 
         mGame = TicTacToeGame()
 
+        val playerId = OnlineRepository.getPlayerId(this)
+
         setContent {
             AndroidTicTacToeTutorial2Theme {
 
-                var resetKey by rememberSaveable { mutableIntStateOf(0) }
-                var resetScoresKey by rememberSaveable { mutableIntStateOf(0) }
-                var selectedDifficulty by rememberSaveable(stateSaver = DifficultySaver) {
-                    mutableStateOf(TicTacToeGame.DifficultyLevel.Harder)
-                }
+                var screen by rememberSaveable { mutableStateOf("menu") }
+                var onlineGameId by rememberSaveable { mutableStateOf("") }
 
-                // mGame es un objeto nuevo tras cada rotación, así que hay que
-                // volver a aplicarle la dificultad restaurada
-                LaunchedEffect(Unit) {
-                    mGame.setDifficultyLevel(selectedDifficulty)
-                }
+                when (screen) {
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    topBar = {
-                        CenterAlignedTopAppBar(
-                            title = {
-                                Text(
-                                    text = stringResource(R.string.app_name),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            },
-                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                                containerColor = Color.Transparent
-                            )
-                        )
-                    },
-                    bottomBar = {
-                        BottomActionsBar(
-                            onNewGame = { resetKey++ },
-                            onResetScores = { resetScoresKey++ },
-                            selectedDifficulty = selectedDifficulty,
-                            onSelectDifficulty = { level ->
-                                selectedDifficulty = level
-                                mGame.setDifficultyLevel(level)
-                            },
-                            onExit = { finish() }
+                    "menu" -> Scaffold { padding ->
+                        MainMenuScreen(
+                            onSinglePlayer = { screen = "single" },
+                            onOnline = { screen = "lobby" },
+                            modifier = Modifier.padding(padding)
                         )
                     }
-                ) { innerPadding ->
 
-                    TicTacToeBoard(
-                        game = mGame,
-                        resetKey = resetKey,
-                        resetScoresKey = resetScoresKey,
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    "single" -> {
+                        BackHandler { screen = "menu" }
+
+                        var resetKey by rememberSaveable { mutableIntStateOf(0) }
+                        var resetScoresKey by rememberSaveable { mutableIntStateOf(0) }
+                        var selectedDifficulty by rememberSaveable(stateSaver = DifficultySaver) {
+                            mutableStateOf(TicTacToeGame.DifficultyLevel.Harder)
+                        }
+
+                        // Sincroniza la dificultad de la UI con la lógica del juego
+                        LaunchedEffect(Unit) {
+                            mGame.setDifficultyLevel(selectedDifficulty)
+                        }
+
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            topBar = {
+                                CenterAlignedTopAppBar(
+                                    title = {
+                                        Text(
+                                            text = stringResource(R.string.app_name),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    },
+                                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                        containerColor = Color.Transparent
+                                    )
+                                )
+                            },
+                            bottomBar = {
+                                BottomActionsBar(
+                                    onNewGame = { resetKey++ },
+                                    onResetScores = { resetScoresKey++ },
+                                    selectedDifficulty = selectedDifficulty,
+                                    onSelectDifficulty = { level ->
+                                        selectedDifficulty = level
+                                        mGame.setDifficultyLevel(level)
+                                    },
+                                    onExit = { screen = "menu" }
+                                )
+                            }
+                        ) { innerPadding ->
+
+                            TicTacToeBoard(
+                                game = mGame,
+                                resetKey = resetKey,
+                                resetScoresKey = resetScoresKey,
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
+                    }
+
+                    "lobby" -> {
+                        BackHandler { screen = "menu" }
+                        Scaffold { padding ->
+                            LobbyScreen(
+                                playerId = playerId,
+                                onEnterGame = { id ->
+                                    onlineGameId = id
+                                    screen = "online"
+                                },
+                                onBack = { screen = "menu" },
+                                modifier = Modifier.padding(padding)
+                            )
+                        }
+                    }
+
+                    "online" -> Scaffold { padding ->
+                        OnlineGameScreen(
+                            gameId = onlineGameId,
+                            playerId = playerId,
+                            onExit = { screen = "lobby" },
+                            modifier = Modifier.padding(padding)
+                        )
+                    }
                 }
             }
         }
@@ -763,6 +808,37 @@ private fun ScoreBoard(
     }
 }
 
+@Composable
+fun MainMenuScreen(
+    onSinglePlayer: () -> Unit,
+    onOnline: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Spacer(Modifier.height(40.dp))
+
+        Button(onClick = onSinglePlayer, modifier = Modifier.fillMaxWidth()) {
+            Text("Jugar contra Android")
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Button(onClick = onOnline, modifier = Modifier.fillMaxWidth()) {
+            Text("Jugar en línea")
+        }
+    }
+}
 
 @Composable
 private fun ScoreItem(label: String, value: Int, accent: Color) {
@@ -782,7 +858,7 @@ private fun ScoreItem(label: String, value: Int, accent: Color) {
 }
 
 @Composable
-private fun GameBoardCanvas(
+fun GameBoardCanvas(
     board: List<Char>,
     gameOver: Boolean,
     humanBitmap: ImageBitmap,

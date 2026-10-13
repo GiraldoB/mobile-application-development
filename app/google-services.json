@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "841579636704",
+    "project_id": "triqui-online-1f86e",
+    "storage_bucket": "triqui-online-1f86e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:841579636704:android:ddea76daebd5f622a4ad85",
+        "android_client_info": {
+          "package_name": "co.edu.unal.tictactoe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAbNG2Eea1ZyNTo6zuq3DN95jlpokFntM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
