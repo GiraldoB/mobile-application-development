@@ -2,7 +2,6 @@ package co.edu.unal.reto10
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -64,7 +63,7 @@ fun MultasScreen(modifier: Modifier = Modifier) {
     fun buscar() {
         val placaConsulta = normalizarPlaca(placa)
         teclado?.hide()
-        foco.clearFocus()
+        foco.clearFocus(force = true)
         if (placaConsulta.length < 3) {
             estado = Estado.Error("Escribe al menos 3 caracteres de la placa.")
             return
@@ -140,12 +139,13 @@ fun MultasScreen(modifier: Modifier = Modifier) {
                 Text("Consultar")
             }
             Spacer(Modifier.height(24.dp))
-            Box(
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .weight(1f)
                     .pointerInput(Unit) {
                         detectTapGestures {
-                            foco.clearFocus()
+                            foco.clearFocus(force = true)
                             teclado?.hide()
                         }
                     },
