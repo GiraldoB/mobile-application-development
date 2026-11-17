@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Oscuro else Claro) {
-                PuntosScreen()
+                MultasScreen()
             }
         }
     }
