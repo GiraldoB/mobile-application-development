@@ -1,6 +1,7 @@
 package co.edu.unal.reto10
 
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,13 +33,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.launch
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.inputmethod.InputMethodManager
 
 private sealed interface Estado {
     data object Inicial : Estado
@@ -52,18 +60,46 @@ private sealed interface Estado {
     ) : Estado
 }
 
+/**
+ * Baja el teclado: mueve el foco a un elemento que no es de texto y, además,
+ * pide ocultar el IME de forma explícita.
+ */
+@Composable
+private fun recordarOcultarTeclado(focoFuera: FocusRequester): () -> Unit {
+    val vista = LocalView.current
+    return remember(vista, focoFuera) {
+        {
+            runCatching { focoFuera.requestFocus() }
+            val inm = vista.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            inm?.hideSoftInputFromWindow(vista.windowToken, 0)
+            vista.context.actividad()?.let { actividad ->
+                WindowInsetsControllerCompat(actividad.window, vista)
+                    .hide(WindowInsetsCompat.Type.ime())
+            }
+        }
+    }
+}
+
+private fun Context.actividad(): Activity? {
+    var contexto: Context = this
+    while (contexto is ContextWrapper) {
+        if (contexto is Activity) return contexto
+        contexto = contexto.baseContext
+    }
+    return null
+}
+
 @Composable
 fun MultasScreen(modifier: Modifier = Modifier) {
     var placa by rememberSaveable { mutableStateOf("") }
     var estado by remember { mutableStateOf<Estado>(Estado.Inicial) }
     val alcance = rememberCoroutineScope()
-    val teclado = LocalSoftwareKeyboardController.current
-    val foco = LocalFocusManager.current
+    val focoFuera = remember { FocusRequester() }
+    val ocultarTeclado = recordarOcultarTeclado(focoFuera)
 
     fun buscar() {
         val placaConsulta = normalizarPlaca(placa)
-        teclado?.hide()
-        foco.clearFocus(force = true)
+        ocultarTeclado()
         if (placaConsulta.length < 3) {
             estado = Estado.Error("Escribe al menos 3 caracteres de la placa.")
             return
@@ -143,11 +179,10 @@ fun MultasScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .focusRequester(focoFuera)
+                    .focusable()
                     .pointerInput(Unit) {
-                        detectTapGestures {
-                            foco.clearFocus(force = true)
-                            teclado?.hide()
-                        }
+                        detectTapGestures { ocultarTeclado() }
                     },
             ) {
                 Contenido(estado) { cargarMas(it) }
