@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  datos.gov.co se firmó con la cadena GlobalSign Root CA - R6, que no está
+  incluida en el almacén de confianza de Android (por eso falla con
+  "Trust anchor for certification path not found"). Se agrega esa raíz como
+  ancla únicamente para ese dominio, manteniendo también las del sistema.
+-->
+<network-security-config>
+    <base-config>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config>
+        <domain includeSubdomains="true">datos.gov.co</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/globalsign_root_r6" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
